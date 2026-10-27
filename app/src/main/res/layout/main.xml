@@ -1,7 +1,19 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg"
+    android:background="@color/bg">
+
+    <!-- Pre-darkened at build time so terminal text stays readable; the TerminalView draws no background of its own. -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@drawable/terminal_bg" />
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:orientation="vertical">
 
     <LinearLayout
@@ -57,7 +69,7 @@
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/surface"
+        android:background="#CC261D29"
         android:scrollbars="none">
         <LinearLayout
             android:id="@+id/extra_keys"
@@ -67,3 +79,4 @@
             android:padding="4dp" />
     </HorizontalScrollView>
 </LinearLayout>
+</FrameLayout>
