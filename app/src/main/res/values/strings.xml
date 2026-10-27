@@ -1,0 +1,4 @@
+<resources>
+    <string name="permission_run_command_label">Chạy lệnh trong Hutao</string>
+    <string name="permission_run_command_description">Cho phép app chạy lệnh tuỳ ý trong terminal Hutao, với toàn bộ quyền và dữ liệu của Hutao.</string>
+</resources>

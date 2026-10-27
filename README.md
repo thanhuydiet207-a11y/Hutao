@@ -7,13 +7,18 @@
 - Nhiều phiên (tab): nút `+` mở phiên mới, chạm để chuyển, giữ lâu để **đổi tên / đóng**
 - Menu `⋮`: bật/tắt ảnh nền, font JetBrains Mono, giữ màn hình sáng, rung khi có bell,
   wake lock (tác vụ dài vẫn chạy khi tắt màn hình; cũng bật/tắt được từ thông báo)
-- Hàng phím phụ: ESC, TAB, CTRL, ALT, mũi tên, HOME/END, PGUP/PGDN, `- / | ~ $`,
-  `⌨` bật/tắt bàn phím, `PASTE` dán
+- Hàng phím phụ 2 hàng kiểu Termux, sửa được trong `~/.hutao/extra-keys.json`
+  (menu `⋮` → *Tải lại phím phụ*). Mỗi phím là tên (`ESC`, `TAB`, `CTRL`, `ALT`, `UP`/`DOWN`/`LEFT`/`RIGHT`,
+  `HOME`, `END`, `PGUP`, `PGDN`, `F1`–`F12`, `ENTER`, `BKSP`, `DEL`, `INS`, `PASTE`, `KEYBOARD`) hoặc chữ bất kỳ;
+  `{"key": "-", "popup": "|"}` = vuốt lên để gõ `|`
 - Phím âm lượng: Vol− = CTRL, Vol+ = ALT cho phím gõ tiếp theo
 - Chụm 2 ngón để phóng to/thu nhỏ chữ (cỡ chữ được nhớ)
 - Giữ lâu trên màn hình để chọn & copy; dán từ clipboard
 - Lịch sử cuộn 10.000 dòng
 - Chạy nền bằng foreground service (phiên không bị hệ thống tắt), nút **Thoát** trên thông báo
+- File: app quản lý file / bộ chọn file của Android thấy mục **Hutao** (thư mục home);
+  nút *Chia sẻ* → *Lưu vào Hutao* lưu file vào `~/downloads`
+- Bật wake lock sẽ hỏi tắt tối ưu pin để Android không tắt app khi chạy lâu
 - Bộ nhớ máy: `~/storage` trỏ tới `/sdcard`; trong Alpine là `/sdcard` (cần cấp quyền bộ nhớ)
 - **Linux đầy đủ (Alpine) với trình quản lý gói `apk`**: bấm nút `Linux` — lần đầu app tự tải
   (~4 MB, có kiểm tra SHA-256) và giải nén, sau đó mở tab Alpine chạy qua `proot`, không cần root:
@@ -23,6 +28,21 @@
   Thư mục `$HOME` của Android được gắn vào `/mnt/hutao`. Từ shell Android, gõ `alpine` để vào.
 - `$HOME` riêng (`/data/data/com.hutao.terminal/files/home`), `~/bin` nằm trong `PATH`,
   `~/.shrc` chạy khi mở shell
+
+## Chạy lệnh từ app khác (RUN_COMMAND)
+Tắt mặc định. Bật trong menu `⋮` → *Cho app khác chạy lệnh*. App gọi phải khai báo và được người dùng cấp
+quyền `com.hutao.terminal.permission.RUN_COMMAND`.
+
+```java
+Intent i = new Intent("com.hutao.terminal.RUN_COMMAND")
+        .setClassName("com.hutao.terminal", "com.hutao.terminal.RunCommandService")
+        .putExtra("command", "uname -a; ls")      // chạy bằng sh -c
+        .putExtra("linux", true)                   // tuỳ chọn: chạy trong Alpine
+        .putExtra("workdir", "/root")              // tuỳ chọn
+        .putExtra("pending_intent", pi);           // tuỳ chọn: nhận stdout, stderr, exit_code, error
+context.startForegroundService(i);
+```
+Kết quả trả về tối đa 100 KB mỗi luồng (stdout/stderr).
 
 ## Build
 ```

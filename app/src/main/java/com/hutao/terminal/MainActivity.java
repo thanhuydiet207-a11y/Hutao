@@ -32,6 +32,7 @@ import java.util.Properties;
 
 public class MainActivity extends Activity implements TerminalSessionClient, TerminalViewClient {
     private static final String TAG = "Hutao";
+    static final String PREFS = "settings"; // shared with RunCommandService
     private static final int SCROLLBACK_ROWS = 10000;
     private static final List<TerminalSession> SESSIONS = TermService.SESSIONS;
 
@@ -52,7 +53,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         terminal = findViewById(R.id.terminal);
         tabs = findViewById(R.id.tabs);
         terminal.setTerminalViewClient(this);
-        prefs = getPreferences(MODE_PRIVATE);
+        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         fontSize = prefs.getInt("fontSize", fontSize);
         terminal.setTextSize(fontSize);
         applySettings();
@@ -76,25 +77,32 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         return newSession(false);
     }
 
-    private TerminalSession newSession(boolean linux) {
-        File home = new File(getFilesDir(), "home");
+    /** Environment for every shell (tabs and RunCommandService); also refreshes ~/bin/alpine. */
+    static Map<String, String> shellEnv(android.content.Context c) {
+        File home = new File(c.getFilesDir(), "home");
         File bin = new File(home, "bin");
         bin.mkdirs();
         linkStorage(home);
         Map<String, String> env = new HashMap<>(System.getenv());
         env.put("HOME", home.getAbsolutePath());
-        env.put("TMPDIR", getCacheDir().getAbsolutePath());
+        env.put("TMPDIR", c.getCacheDir().getAbsolutePath());
         env.put("TERM", "xterm-256color");
         env.put("COLORTERM", "truecolor");
         env.put("LANG", "en_US.UTF-8");
         env.put("PATH", bin + ":" + env.getOrDefault("PATH", "/system/bin"));
         env.put("ENV", home + "/.shrc"); // startup script, like ~/.bashrc
-        Linux.putProotEnv(this, env);
+        Linux.putProotEnv(c, env);
         try {
-            Linux.writeLauncherScript(this, bin, env);
+            Linux.writeLauncherScript(c, bin, env);
         } catch (IOException e) {
-            logStackTrace(TAG, e);
+            android.util.Log.e(TAG, "launcher script", e);
         }
+        return env;
+    }
+
+    private TerminalSession newSession(boolean linux) {
+        File home = new File(getFilesDir(), "home");
+        Map<String, String> env = shellEnv(this);
         String[] envArr = new String[env.size()];
         int i = 0;
         for (Map.Entry<String, String> e : env.entrySet()) envArr[i++] = e.getKey() + "=" + e.getValue();
@@ -226,6 +234,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         addToggle(m, "Font JetBrains Mono", "jetbrainsFont", true);
         addToggle(m, "Giữ màn hình sáng", "keepScreenOn", false);
         addToggle(m, "Rung khi có chuông (bell)", "vibrateOnBell", true);
+        addToggle(m, "Cho app khác chạy lệnh (RUN_COMMAND)", RunCommandService.PREF_ALLOW, false);
         m.getMenu().add("Tải lại phím phụ (~/.hutao/extra-keys.json)")
                 .setOnMenuItemClickListener(i -> { buildExtraKeys(); return true; });
         m.getMenu().add("Wake lock (chạy khi tắt màn hình)").setCheckable(true)
