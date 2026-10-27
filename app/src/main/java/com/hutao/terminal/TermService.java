@@ -20,9 +20,16 @@ public class TermService extends Service {
     public static final List<TerminalSession> SESSIONS = new ArrayList<>();
 
     private static final String CHANNEL = "sessions";
+    private static final String ACTION_EXIT = "com.hutao.terminal.EXIT";
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_EXIT.equals(intent.getAction())) {
+            // Killing the shells makes MainActivity drop each session and close itself.
+            for (TerminalSession s : new ArrayList<>(SESSIONS)) s.finishIfRunning();
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
             getSystemService(NotificationManager.class).createNotificationChannel(
@@ -33,11 +40,14 @@ public class TermService extends Service {
         }
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class),
                 PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent exit = PendingIntent.getService(this, 1,
+                new Intent(this, TermService.class).setAction(ACTION_EXIT), PendingIntent.FLAG_IMMUTABLE);
         startForeground(1, b.setContentTitle("Hutao")
                 .setContentText(SESSIONS.size() + " session(s) running")
                 .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setContentIntent(open)
                 .setOngoing(true)
+                .addAction(new Notification.Action.Builder(null, "Thoát", exit).build())
                 .build());
         return START_NOT_STICKY;
     }

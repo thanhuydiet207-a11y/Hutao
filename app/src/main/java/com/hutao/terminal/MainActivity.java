@@ -42,6 +42,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
             {"HOME", "" + KeyEvent.KEYCODE_MOVE_HOME}, {"END", "" + KeyEvent.KEYCODE_MOVE_END},
             {"PGUP", "" + KeyEvent.KEYCODE_PAGE_UP}, {"PGDN", "" + KeyEvent.KEYCODE_PAGE_DOWN},
             {"-", "0"}, {"/", "0"}, {"|", "0"}, {"~", "0"}, {"$", "0"},
+            {"⌨", "-3"}, {"PASTE", "-4"},
     };
 
     private TerminalView terminal;
@@ -58,12 +59,17 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         terminal = findViewById(R.id.terminal);
         tabs = findViewById(R.id.tabs);
         terminal.setTerminalViewClient(this);
+        fontSize = getPreferences(MODE_PRIVATE).getInt("fontSize", fontSize);
         terminal.setTextSize(fontSize);
         terminal.setTypeface(Typeface.MONOSPACE);
         findViewById(R.id.new_tab).setOnClickListener(v -> switchTo(newSession()));
         TextView linux = findViewById(R.id.linux);
         linux.setOnClickListener(v -> openLinux(linux));
         buildExtraKeys();
+        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+        }
 
         // Process may have outlived a previous activity: re-adopt its sessions.
         for (TerminalSession s : SESSIONS) s.updateTerminalSessionClient(this);
@@ -78,6 +84,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         File home = new File(getFilesDir(), "home");
         File bin = new File(home, "bin");
         bin.mkdirs();
+        linkStorage(home);
         Map<String, String> env = new HashMap<>(System.getenv());
         env.put("HOME", home.getAbsolutePath());
         env.put("TMPDIR", getCacheDir().getAbsolutePath());
@@ -118,6 +125,18 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
             }
             runOnUiThread(() -> { button.setText("🐧 Linux"); button.setEnabled(true); });
         }).start();
+    }
+
+    /** ~/storage -> shared storage (/sdcard), so files are reachable from the shell. */
+    private static void linkStorage(File home) {
+        java.nio.file.Path link = new File(home, "storage").toPath();
+        if (java.nio.file.Files.exists(link, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
+        try {
+            java.nio.file.Files.createSymbolicLink(link,
+                    android.os.Environment.getExternalStorageDirectory().toPath());
+        } catch (IOException e) {
+            android.util.Log.w(TAG, "storage link", e);
+        }
     }
 
     private void startKeepAlive() {
@@ -202,6 +221,8 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     private void onExtraKey(String label, int code) {
         if (code == -1) { ctrl = !ctrl; updateModifierButtons(); return; }
         if (code == -2) { alt = !alt; updateModifierButtons(); return; }
+        if (code == -3) { getSystemService(InputMethodManager.class).toggleSoftInput(0, 0); return; }
+        if (code == -4) { onPasteTextFromClipboard(terminal.getCurrentSession()); return; }
         if (code == 0) {
             terminal.inputCodePoint(label.codePointAt(0), ctrl, alt);
         } else {
@@ -266,6 +287,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         if (scale > 0.9f && scale < 1.1f) return scale;
         fontSize = Math.max(12, Math.min(72, fontSize + (scale > 1 ? 2 : -2)));
         terminal.setTextSize(fontSize);
+        getPreferences(MODE_PRIVATE).edit().putInt("fontSize", fontSize).apply();
         return 1f;
     }
 
@@ -279,8 +301,18 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     @Override public boolean shouldUseCtrlSpaceWorkaround() { return false; }
     @Override public boolean isTerminalViewSelected() { return true; }
     @Override public void copyModeChanged(boolean copyMode) {}
-    @Override public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession s) { return false; }
-    @Override public boolean onKeyUp(int keyCode, KeyEvent e) { return false; }
+    @Override public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession s) {
+        // Volume down = CTRL, volume up = ALT for the next key, like Termux.
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) ctrl = true;
+        else if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) alt = true;
+        else return false;
+        updateModifierButtons();
+        return true;
+    }
+
+    @Override public boolean onKeyUp(int keyCode, KeyEvent e) {
+        return keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP;
+    }
     @Override public boolean onLongPress(MotionEvent e) { return false; }
     @Override public boolean readControlKey() { return ctrl; }
     @Override public boolean readAltKey() { return alt; }

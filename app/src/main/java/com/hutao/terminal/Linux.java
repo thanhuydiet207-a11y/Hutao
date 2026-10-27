@@ -102,6 +102,8 @@ public final class Linux {
         a.add("-b"); a.add("/proc");
         a.add("-b"); a.add("/sys");
         a.add("-b"); a.add(home.getAbsolutePath() + ":/mnt/hutao");
+        File sdcard = android.os.Environment.getExternalStorageDirectory();
+        if (sdcard.canRead()) { a.add("-b"); a.add(sdcard + ":/sdcard"); }
         a.add("-w"); a.add("/root");
         a.add("/usr/bin/env"); a.add("-i");
         a.add("HOME=/root");
