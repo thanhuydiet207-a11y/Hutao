@@ -241,10 +241,22 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         m.getMenu().add("Wake lock (chạy khi tắt màn hình)").setCheckable(true)
                 .setChecked(TermService.isWakeLocked())
                 .setOnMenuItemClickListener(i -> {
+                    if (!TermService.isWakeLocked()) askIgnoreBatteryOptimizations();
                     startService(new Intent(this, TermService.class).setAction(TermService.ACTION_WAKE_LOCK));
                     return true;
                 });
         m.show();
+    }
+
+    /** A wake lock alone does not stop Doze/vendor battery savers from killing the app; this exemption does. */
+    private void askIgnoreBatteryOptimizations() {
+        if (getSystemService(android.os.PowerManager.class).isIgnoringBatteryOptimizations(getPackageName())) return;
+        try {
+            startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    android.net.Uri.parse("package:" + getPackageName())));
+        } catch (android.content.ActivityNotFoundException e) {
+            Toast.makeText(this, "Máy không hỗ trợ tắt tối ưu pin cho app", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void addToggle(PopupMenu m, String label, String key, boolean def) {
