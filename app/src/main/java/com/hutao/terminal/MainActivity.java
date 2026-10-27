@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
-import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
@@ -12,10 +11,11 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.termux.terminal.TerminalColors;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
 import com.termux.view.TerminalView;
@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 public class MainActivity extends Activity implements TerminalSessionClient, TerminalViewClient {
     private static final String TAG = "Hutao";
@@ -45,13 +46,14 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
 
     private TerminalView terminal;
     private LinearLayout tabs;
-    private Button ctrlButton, altButton;
+    private TextView ctrlButton, altButton;
     private boolean ctrl, alt;
     private int fontSize = 28;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        applyColorScheme();
         setContentView(R.layout.main);
         terminal = findViewById(R.id.terminal);
         tabs = findViewById(R.id.tabs);
@@ -59,7 +61,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         terminal.setTextSize(fontSize);
         terminal.setTypeface(Typeface.MONOSPACE);
         findViewById(R.id.new_tab).setOnClickListener(v -> switchTo(newSession()));
-        Button linux = findViewById(R.id.linux);
+        TextView linux = findViewById(R.id.linux);
         linux.setOnClickListener(v -> openLinux(linux));
         buildExtraKeys();
 
@@ -103,7 +105,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         return s;
     }
 
-    private void openLinux(Button button) {
+    private void openLinux(TextView button) {
         if (Linux.isInstalled(this)) { switchTo(newSession(true)); return; }
         button.setEnabled(false);
         new Thread(() -> {
@@ -114,7 +116,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
                 logStackTrace(TAG, e);
                 runOnUiThread(() -> Toast.makeText(this, "Cài Linux lỗi: " + e.getMessage(), Toast.LENGTH_LONG).show());
             }
-            runOnUiThread(() -> { button.setText("Linux"); button.setEnabled(true); });
+            runOnUiThread(() -> { button.setText("🐧 Linux"); button.setEnabled(true); });
         }).start();
     }
 
@@ -130,14 +132,42 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         refreshTabs();
     }
 
+    /** Terminal palette matching the app theme; applies to sessions created afterwards. */
+    private void applyColorScheme() {
+        Properties p = new Properties();
+        p.put("background", hex(R.color.bg));
+        p.put("foreground", hex(R.color.text));
+        p.put("cursor", hex(R.color.accent));
+        TerminalColors.COLOR_SCHEME.updateWith(p);
+    }
+
+    private String hex(int colorRes) {
+        return String.format("#%06X", getColor(colorRes) & 0xFFFFFF);
+    }
+
+    private TextView chip(String text) {
+        // Same look as the @style/Chip views in main.xml.
+        TextView v = new TextView(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, (int) (32 * dp));
+        lp.setMarginEnd((int) (6 * dp));
+        v.setLayoutParams(lp);
+        v.setGravity(android.view.Gravity.CENTER);
+        v.setPadding((int) (14 * dp), 0, (int) (14 * dp), 0);
+        v.setTextSize(13);
+        v.setText(text);
+        return v;
+    }
+
     private void refreshTabs() {
         tabs.removeAllViews();
         for (TerminalSession s : SESSIONS) {
-            Button b = new Button(this);
             String title = s.getTitle();
-            b.setText(title != null && !title.isEmpty() ? title : s.mSessionName);
-            b.setAllCaps(false);
-            b.setTextColor(s == terminal.getCurrentSession() ? Color.WHITE : Color.GRAY);
+            TextView b = chip(title != null && !title.isEmpty() ? title : s.mSessionName);
+            boolean current = s == terminal.getCurrentSession();
+            b.setBackgroundResource(current ? R.drawable.chip_selected : R.drawable.chip);
+            b.setTextColor(getColor(current ? R.color.on_accent : R.color.text));
             b.setOnClickListener(v -> switchTo(s));
             b.setOnLongClickListener(v -> { s.finishIfRunning(); return true; }); // long-press closes
             tabs.addView(b);
@@ -146,12 +176,21 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
 
     private void buildExtraKeys() {
         LinearLayout row = findViewById(R.id.extra_keys);
+        float dp = getResources().getDisplayMetrics().density;
         for (String[] key : EXTRA_KEYS) {
-            Button b = new Button(this);
+            TextView b = new TextView(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, (int) (40 * dp));
+            lp.setMargins((int) (2 * dp), 0, (int) (2 * dp), 0);
+            b.setLayoutParams(lp);
+            b.setMinWidth((int) (44 * dp));
+            b.setPadding((int) (10 * dp), 0, (int) (10 * dp), 0);
+            b.setGravity(android.view.Gravity.CENTER);
+            b.setBackgroundResource(R.drawable.key);
+            b.setTextColor(getColor(R.color.text));
+            b.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            b.setTextSize(13);
             b.setText(key[0]);
-            b.setAllCaps(false);
-            b.setMinWidth(0);
-            b.setMinimumWidth(0);
             int code = Integer.parseInt(key[1]);
             if (code == -1) ctrlButton = b;
             if (code == -2) altButton = b;
@@ -180,8 +219,8 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     }
 
     private void updateModifierButtons() {
-        ctrlButton.setTextColor(ctrl ? Color.CYAN : Color.WHITE);
-        altButton.setTextColor(alt ? Color.CYAN : Color.WHITE);
+        ctrlButton.setTextColor(getColor(ctrl ? R.color.accent : R.color.text));
+        altButton.setTextColor(getColor(alt ? R.color.accent : R.color.text));
     }
 
     // ---- TerminalSessionClient ----

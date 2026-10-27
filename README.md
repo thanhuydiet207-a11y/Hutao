@@ -31,4 +31,4 @@ Cần JDK 17+ và Android SDK (platform 34). GitHub Actions cũng build APK ở 
 
 ## Chưa có
 - Truy cập `/sdcard` (chưa xin quyền bộ nhớ)
-- Cài đặt giao diện (màu, font), icon riêng
+- Tuỳ chọn đổi màu/font trong app

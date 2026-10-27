@@ -1,35 +1,47 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000"
+    android:background="@color/bg"
     android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="8dp">
+        <ImageView
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginEnd="10dp"
+            android:contentDescription="@null"
+            android:src="@mipmap/ic_launcher_round" />
         <HorizontalScrollView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:scrollbars="none">
             <LinearLayout
                 android:id="@+id/tabs"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal" />
         </HorizontalScrollView>
-        <Button
+        <TextView
             android:id="@+id/linux"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAllCaps="false"
-            android:text="Linux" />
-        <Button
+            style="@style/Chip"
+            android:text="🐧 Linux" />
+        <TextView
             android:id="@+id/new_tab"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="48dp"
+            style="@style/Chip"
+            android:layout_width="32dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
             android:contentDescription="New session"
+            android:textSize="18sp"
             android:text="+" />
     </LinearLayout>
 
@@ -38,15 +50,20 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
         android:focusableInTouchMode="true" />
 
     <HorizontalScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        android:scrollbars="none">
         <LinearLayout
             android:id="@+id/extra_keys"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal" />
+            android:orientation="horizontal"
+            android:padding="4dp" />
     </HorizontalScrollView>
 </LinearLayout>
