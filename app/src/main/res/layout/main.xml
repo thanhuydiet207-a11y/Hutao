@@ -19,6 +19,12 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
         <Button
+            android:id="@+id/linux"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAllCaps="false"
+            android:text="Linux" />
+        <Button
             android:id="@+id/new_tab"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

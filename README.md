@@ -10,6 +10,12 @@
 - Giữ lâu trên màn hình để chọn & copy; dán từ clipboard
 - Lịch sử cuộn 10.000 dòng
 - Chạy nền bằng foreground service (phiên không bị hệ thống tắt)
+- **Linux đầy đủ (Alpine) với trình quản lý gói `apk`**: bấm nút `Linux` — lần đầu app tự tải
+  (~4 MB, có kiểm tra SHA-256) và giải nén, sau đó mở tab Alpine chạy qua `proot`, không cần root:
+  ```
+  apk update && apk add python3 git nodejs gcc openssh vim
+  ```
+  Thư mục `$HOME` của Android được gắn vào `/mnt/hutao`. Từ shell Android, gõ `alpine` để vào.
 - `$HOME` riêng (`/data/data/com.hutao.terminal/files/home`), `~/bin` nằm trong `PATH`,
   `~/.shrc` chạy khi mở shell
 
@@ -20,6 +26,9 @@
 ```
 Cần JDK 17+ và Android SDK (platform 34). GitHub Actions cũng build APK ở mỗi lần push (tab Actions → artifact `hutao-debug-apk`).
 
+`proot` lấy từ kho gói Termux, đóng gói sẵn trong `app/src/main/jniLibs`; cập nhật bằng
+`scripts/fetch-proot.sh` (cần `curl`, `ar`, `patchelf`). Test: `./gradlew testDebugUnitTest`.
+
 ## Chưa có
-- Trình quản lý gói (`pkg install ...`): bootstrap của Termux bị gắn cứng đường dẫn
-  `/data/data/com.termux`, cần tự build lại gói hoặc dùng proot + rootfs Linux.
+- Truy cập `/sdcard` (chưa xin quyền bộ nhớ)
+- Cài đặt giao diện (màu, font), icon riêng

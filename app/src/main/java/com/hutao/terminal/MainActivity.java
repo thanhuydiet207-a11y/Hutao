@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
@@ -21,11 +22,13 @@ import com.termux.view.TerminalView;
 import com.termux.view.TerminalViewClient;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends Activity implements TerminalSessionClient, TerminalViewClient {
+    private static final String TAG = "Hutao";
     private static final int SCROLLBACK_ROWS = 10000;
     private static final List<TerminalSession> SESSIONS = TermService.SESSIONS;
 
@@ -56,6 +59,8 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         terminal.setTextSize(fontSize);
         terminal.setTypeface(Typeface.MONOSPACE);
         findViewById(R.id.new_tab).setOnClickListener(v -> switchTo(newSession()));
+        Button linux = findViewById(R.id.linux);
+        linux.setOnClickListener(v -> openLinux(linux));
         buildExtraKeys();
 
         // Process may have outlived a previous activity: re-adopt its sessions.
@@ -64,26 +69,53 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     }
 
     private TerminalSession newSession() {
+        return newSession(false);
+    }
+
+    private TerminalSession newSession(boolean linux) {
         File home = new File(getFilesDir(), "home");
-        new File(home, "bin").mkdirs();
+        File bin = new File(home, "bin");
+        bin.mkdirs();
         Map<String, String> env = new HashMap<>(System.getenv());
         env.put("HOME", home.getAbsolutePath());
         env.put("TMPDIR", getCacheDir().getAbsolutePath());
         env.put("TERM", "xterm-256color");
         env.put("COLORTERM", "truecolor");
         env.put("LANG", "en_US.UTF-8");
-        env.put("PATH", home + "/bin:" + env.getOrDefault("PATH", "/system/bin"));
+        env.put("PATH", bin + ":" + env.getOrDefault("PATH", "/system/bin"));
         env.put("ENV", home + "/.shrc"); // startup script, like ~/.bashrc
+        Linux.putProotEnv(this, env);
+        try {
+            Linux.writeLauncherScript(this, bin, env);
+        } catch (IOException e) {
+            logStackTrace(TAG, e);
+        }
         String[] envArr = new String[env.size()];
         int i = 0;
         for (Map.Entry<String, String> e : env.entrySet()) envArr[i++] = e.getKey() + "=" + e.getValue();
 
-        TerminalSession s = new TerminalSession("/system/bin/sh", home.getAbsolutePath(),
-                new String[]{"-sh"}, envArr, SCROLLBACK_ROWS, this);
-        s.mSessionName = "sh " + (SESSIONS.size() + 1);
+        String[] argv = linux ? Linux.command(this) : new String[]{"/system/bin/sh", "-sh"};
+        TerminalSession s = new TerminalSession(argv[0], home.getAbsolutePath(),
+                java.util.Arrays.copyOfRange(argv, linux ? 0 : 1, argv.length), envArr, SCROLLBACK_ROWS, this);
+        s.mSessionName = (linux ? "alpine " : "sh ") + (SESSIONS.size() + 1);
         SESSIONS.add(s);
         startKeepAlive();
         return s;
+    }
+
+    private void openLinux(Button button) {
+        if (Linux.isInstalled(this)) { switchTo(newSession(true)); return; }
+        button.setEnabled(false);
+        new Thread(() -> {
+            try {
+                Linux.install(this, msg -> runOnUiThread(() -> button.setText(msg)));
+                runOnUiThread(() -> switchTo(newSession(true)));
+            } catch (Exception e) {
+                logStackTrace(TAG, e);
+                runOnUiThread(() -> Toast.makeText(this, "Cài Linux lỗi: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+            runOnUiThread(() -> { button.setText("Linux"); button.setEnabled(true); });
+        }).start();
     }
 
     private void startKeepAlive() {

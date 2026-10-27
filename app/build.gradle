@@ -5,7 +5,7 @@ android {
     compileSdk 34
     defaultConfig {
         applicationId 'com.hutao.terminal'
-        minSdk 24
+        minSdk 26 // java.nio symlinks (TarExtractor)
         // targetSdk 28: Android 10+ blocks exec() of files in app data (W^X); 28 keeps user binaries in $HOME runnable, same trick as Termux.
         targetSdk 28
         versionCode 1
@@ -20,4 +20,5 @@ android {
 
 dependencies {
     implementation 'com.github.termux.termux-app:terminal-view:v0.118.0'
+    testImplementation 'junit:junit:4.13.2'
 }
