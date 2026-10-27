@@ -77,6 +77,20 @@ public class TarExtractorTest {
         assertFalse(new File(outside, "evil").exists());
     }
 
+    @Test public void deleteTreeKeepsSymlinkTargets() throws IOException {
+        File outside = tmp.newFolder("keep");
+        File kept = new File(outside, "file");
+        Files.write(kept.toPath(), bytes("x"));
+        File dir = tmp.newFolder("tree");
+        new File(dir, "a/b").mkdirs();
+        Files.write(new File(dir, "a/b/f").toPath(), bytes("y"));
+        Files.createSymbolicLink(new File(dir, "a/link").toPath(), outside.toPath());
+        TarExtractor.deleteTree(dir);
+        assertFalse(dir.exists());
+        assertTrue(kept.exists());
+        TarExtractor.deleteTree(dir); // missing dir is a no-op
+    }
+
     @Test public void paxValueParsesRecords() {
         assertEquals("a/b", TarExtractor.paxValue("12 path=a/b\n20 linkpath=c\n", "path"));
         assertEquals("c", TarExtractor.paxValue("12 path=a/b\n20 linkpath=c\n", "linkpath"));

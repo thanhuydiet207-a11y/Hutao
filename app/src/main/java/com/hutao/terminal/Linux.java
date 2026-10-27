@@ -76,16 +76,22 @@ public final class Linux {
         }
 
         p.update("Đang giải nén…");
+        // Unpack into a staging dir and rename at the end (as Termux does), so a failed
+        // install never leaves a half-extracted rootfs behind.
         File root = rootfs(c);
+        File staging = new File(c.getFilesDir(), "alpine-staging");
+        TarExtractor.deleteTree(staging);
         try (InputStream in = new GZIPInputStream(new java.io.FileInputStream(tgz))) {
-            TarExtractor.extract(in, root);
+            TarExtractor.extract(in, staging);
         } finally {
             tgz.delete();
         }
-        try (FileOutputStream out = new FileOutputStream(new File(root, "etc/resolv.conf"))) {
+        try (FileOutputStream out = new FileOutputStream(new File(staging, "etc/resolv.conf"))) {
             out.write("nameserver 8.8.8.8\nnameserver 1.1.1.1\n".getBytes(StandardCharsets.UTF_8));
         }
-        new File(root, ".hutao-installed").createNewFile();
+        new File(staging, ".hutao-installed").createNewFile();
+        TarExtractor.deleteTree(root); // leftovers of an older, unmarked install
+        if (!staging.renameTo(root)) throw new IOException("không chuyển được rootfs vào chỗ");
     }
 
     /** argv for a login shell inside Alpine; argv[0] is the proot binary. */

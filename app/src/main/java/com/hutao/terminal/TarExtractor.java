@@ -83,6 +83,17 @@ public final class TarExtractor {
         }
     }
 
+    /** Recursively deletes a directory without following symlinks (a rootfs is full of absolute ones). */
+    public static void deleteTree(File dir) throws IOException {
+        Path root = dir.toPath();
+        if (!Files.exists(root, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
+        try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
+            for (Path p : (Iterable<Path>) walk.sorted(java.util.Comparator.reverseOrder())::iterator) {
+                Files.delete(p);
+            }
+        }
+    }
+
     /** Resolves an archive path under root, refusing anything that climbs out with "..". Null for the root itself. */
     static Path safeResolve(Path root, String name) throws IOException {
         Path p = root.resolve(name.replaceFirst("^/+", "")).normalize();
