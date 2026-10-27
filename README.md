@@ -26,6 +26,9 @@
   apk update && apk add python3 git nodejs gcc openssh vim
   ```
   Thư mục `$HOME` của Android được gắn vào `/mnt/hutao`. Từ shell Android, gõ `alpine` để vào.
+- Lệnh `pkg` kiểu Termux (chạy trên `apk` của Alpine), gõ được ở cả tab `sh` lẫn tab Alpine:
+  `pkg install python3`, `pkg uninstall`, `pkg update`, `pkg upgrade`, `pkg search`, `pkg show`,
+  `pkg list-installed`, `pkg files`. Gói cài xong dùng trong tab Alpine (hoặc `alpine -c 'lệnh'` từ tab `sh`).
 - `$HOME` riêng (`/data/data/com.hutao.terminal/files/home`), `~/bin` nằm trong `PATH`,
   `~/.shrc` chạy khi mở shell
 

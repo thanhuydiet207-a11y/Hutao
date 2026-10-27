@@ -89,6 +89,7 @@ public final class Linux {
         try (FileOutputStream out = new FileOutputStream(new File(staging, "etc/resolv.conf"))) {
             out.write("nameserver 8.8.8.8\nnameserver 1.1.1.1\n".getBytes(StandardCharsets.UTF_8));
         }
+        installPkg(c, staging);
         new File(staging, ".hutao-installed").createNewFile();
         TarExtractor.deleteTree(root); // leftovers of an older, unmarked install
         if (!staging.renameTo(root)) throw new IOException("không chuyển được rootfs vào chỗ");
@@ -141,9 +142,26 @@ public final class Linux {
         s.append("exec");
         for (String arg : command(c)) s.append(' ').append(quote(arg));
         s.append(" \"$@\"\n");
-        File f = new File(binDir, "alpine");
+        writeScript(new File(binDir, "alpine"), s.toString());
+        // `pkg` from the Android shell runs the same command inside Alpine.
+        writeScript(new File(binDir, "pkg"), "#!/system/bin/sh\nexec \"$HOME/bin/alpine\" -c 'pkg \"$@\"' pkg \"$@\"\n");
+        if (isInstalled(c)) installPkg(c, rootfs(c)); // rootfs from before pkg existed
+    }
+
+    /** Copies the apk-backed `pkg` command into the rootfs. */
+    private static void installPkg(Context c, File root) throws IOException {
+        File f = new File(root, "usr/local/bin/pkg");
+        f.getParentFile().mkdirs();
+        try (InputStream in = c.getAssets().open("pkg.sh"); FileOutputStream out = new FileOutputStream(f)) {
+            byte[] buf = new byte[8192];
+            for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+        }
+        f.setExecutable(true, false);
+    }
+
+    private static void writeScript(File f, String text) throws IOException {
         try (FileOutputStream out = new FileOutputStream(f)) {
-            out.write(s.toString().getBytes(StandardCharsets.UTF_8));
+            out.write(text.getBytes(StandardCharsets.UTF_8));
         }
         f.setExecutable(true, true);
     }
