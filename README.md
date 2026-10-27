@@ -4,7 +4,9 @@
 
 ## Tính năng
 - Shell thật (`/system/bin/sh`) qua PTY, hỗ trợ màu 256/truecolor
-- Nhiều phiên (tab): nút `+` mở phiên mới, chạm để chuyển, **giữ lâu để đóng**
+- Nhiều phiên (tab): nút `+` mở phiên mới, chạm để chuyển, giữ lâu để **đổi tên / đóng**
+- Menu `⋮`: bật/tắt ảnh nền, font JetBrains Mono, giữ màn hình sáng, rung khi có bell,
+  wake lock (tác vụ dài vẫn chạy khi tắt màn hình; cũng bật/tắt được từ thông báo)
 - Hàng phím phụ: ESC, TAB, CTRL, ALT, mũi tên, HOME/END, PGUP/PGDN, `- / | ~ $`,
   `⌨` bật/tắt bàn phím, `PASTE` dán
 - Phím âm lượng: Vol− = CTRL, Vol+ = ALT cho phím gõ tiếp theo
@@ -33,4 +35,6 @@ Cần JDK 17+ và Android SDK (platform 34). GitHub Actions cũng build APK ở 
 `scripts/fetch-proot.sh` (cần `curl`, `ar`, `patchelf`). Test: `./gradlew testDebugUnitTest`.
 
 ## Chưa có
-- Tuỳ chọn đổi màu/font trong app
+- Đổi bảng màu terminal trong app
+
+Font JetBrains Mono: SIL Open Font License 1.1 (`app/src/main/assets/fonts/OFL.txt`).

@@ -5,6 +5,7 @@
 
     <!-- Pre-darkened at build time so terminal text stays readable; the TerminalView draws no background of its own. -->
     <ImageView
+        android:id="@+id/background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="@null"
@@ -55,6 +56,15 @@
             android:contentDescription="New session"
             android:textSize="18sp"
             android:text="+" />
+        <TextView
+            android:id="@+id/menu"
+            style="@style/Chip"
+            android:layout_width="32dp"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp"
+            android:contentDescription="Menu"
+            android:textSize="18sp"
+            android:text="⋮" />
     </LinearLayout>
 
     <com.termux.view.TerminalView

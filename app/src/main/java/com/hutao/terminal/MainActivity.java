@@ -11,7 +11,9 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -50,6 +52,9 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     private TextView ctrlButton, altButton;
     private boolean ctrl, alt;
     private int fontSize = 28;
+    // User-chosen tab names win over titles set by programs (escape sequences).
+    private static final Map<TerminalSession, String> CUSTOM_NAMES = new java.util.WeakHashMap<>();
+    private android.content.SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,9 +64,12 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         terminal = findViewById(R.id.terminal);
         tabs = findViewById(R.id.tabs);
         terminal.setTerminalViewClient(this);
-        fontSize = getPreferences(MODE_PRIVATE).getInt("fontSize", fontSize);
+        prefs = getPreferences(MODE_PRIVATE);
+        fontSize = prefs.getInt("fontSize", fontSize);
         terminal.setTextSize(fontSize);
-        terminal.setTypeface(Typeface.MONOSPACE);
+        applySettings();
+        View menu = findViewById(R.id.menu);
+        menu.setOnClickListener(v -> showMenu(menu));
         findViewById(R.id.new_tab).setOnClickListener(v -> switchTo(newSession()));
         TextView linux = findViewById(R.id.linux);
         linux.setOnClickListener(v -> openLinux(linux));
@@ -182,15 +190,78 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     private void refreshTabs() {
         tabs.removeAllViews();
         for (TerminalSession s : SESSIONS) {
-            String title = s.getTitle();
-            TextView b = chip(title != null && !title.isEmpty() ? title : s.mSessionName);
+            TextView b = chip(tabName(s));
             boolean current = s == terminal.getCurrentSession();
             b.setBackgroundResource(current ? R.drawable.chip_selected : R.drawable.chip);
             b.setTextColor(getColor(current ? R.color.on_accent : R.color.text));
             b.setOnClickListener(v -> switchTo(s));
-            b.setOnLongClickListener(v -> { s.finishIfRunning(); return true; }); // long-press closes
+            b.setOnLongClickListener(v -> { showTabMenu(v, s); return true; });
             tabs.addView(b);
         }
+    }
+
+    private static String tabName(TerminalSession s) {
+        String name = CUSTOM_NAMES.get(s);
+        if (name != null) return name;
+        String title = s.getTitle();
+        return title != null && !title.isEmpty() ? title : s.mSessionName;
+    }
+
+    private void showTabMenu(View anchor, TerminalSession s) {
+        PopupMenu m = new PopupMenu(this, anchor);
+        m.getMenu().add("Đổi tên").setOnMenuItemClickListener(i -> { renameTab(s); return true; });
+        m.getMenu().add("Đóng").setOnMenuItemClickListener(i -> { s.finishIfRunning(); return true; });
+        m.show();
+    }
+
+    private void renameTab(TerminalSession s) {
+        EditText input = new EditText(this);
+        input.setSingleLine();
+        input.setText(tabName(s));
+        input.selectAll();
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Đổi tên tab")
+                .setView(input)
+                .setPositiveButton("OK", (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) CUSTOM_NAMES.remove(s);
+                    else CUSTOM_NAMES.put(s, name);
+                    refreshTabs();
+                })
+                .setNegativeButton("Huỷ", null)
+                .show();
+    }
+
+    private void showMenu(View anchor) {
+        PopupMenu m = new PopupMenu(this, anchor);
+        addToggle(m, "Ảnh nền", "background", true);
+        addToggle(m, "Font JetBrains Mono", "jetbrainsFont", true);
+        addToggle(m, "Giữ màn hình sáng", "keepScreenOn", false);
+        addToggle(m, "Rung khi có chuông (bell)", "vibrateOnBell", true);
+        m.getMenu().add("Wake lock (chạy khi tắt màn hình)").setCheckable(true)
+                .setChecked(TermService.isWakeLocked())
+                .setOnMenuItemClickListener(i -> {
+                    startService(new Intent(this, TermService.class).setAction(TermService.ACTION_WAKE_LOCK));
+                    return true;
+                });
+        m.show();
+    }
+
+    private void addToggle(PopupMenu m, String label, String key, boolean def) {
+        m.getMenu().add(label).setCheckable(true).setChecked(prefs.getBoolean(key, def))
+                .setOnMenuItemClickListener(i -> {
+                    prefs.edit().putBoolean(key, !prefs.getBoolean(key, def)).apply();
+                    applySettings();
+                    return true;
+                });
+    }
+
+    private void applySettings() {
+        findViewById(R.id.background).setVisibility(prefs.getBoolean("background", true) ? View.VISIBLE : View.GONE);
+        terminal.setTypeface(prefs.getBoolean("jetbrainsFont", true)
+                ? Typeface.createFromAsset(getAssets(), "fonts/JetBrainsMono-Regular.ttf")
+                : Typeface.MONOSPACE);
+        terminal.setKeepScreenOn(prefs.getBoolean("keepScreenOn", false));
     }
 
     private void buildExtraKeys() {
@@ -275,7 +346,11 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         if (text != null) s.getEmulator().paste(text.toString());
     }
 
-    @Override public void onBell(TerminalSession s) {}
+    @Override public void onBell(TerminalSession s) {
+        if (!prefs.getBoolean("vibrateOnBell", true)) return;
+        android.os.Vibrator v = getSystemService(android.os.Vibrator.class);
+        if (v != null) v.vibrate(android.os.VibrationEffect.createOneShot(40, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+    }
     @Override public void onColorsChanged(TerminalSession s) { terminal.invalidate(); }
     @Override public void onTerminalCursorStateChange(boolean state) {}
     @Override public Integer getTerminalCursorStyle() { return null; }
@@ -287,7 +362,7 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         if (scale > 0.9f && scale < 1.1f) return scale;
         fontSize = Math.max(12, Math.min(72, fontSize + (scale > 1 ? 2 : -2)));
         terminal.setTextSize(fontSize);
-        getPreferences(MODE_PRIVATE).edit().putInt("fontSize", fontSize).apply();
+        prefs.edit().putInt("fontSize", fontSize).apply();
         return 1f;
     }
 

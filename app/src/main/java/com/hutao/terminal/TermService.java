@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 
 import com.termux.terminal.TerminalSession;
 
@@ -21,6 +22,11 @@ public class TermService extends Service {
 
     private static final String CHANNEL = "sessions";
     private static final String ACTION_EXIT = "com.hutao.terminal.EXIT";
+    static final String ACTION_WAKE_LOCK = "com.hutao.terminal.WAKE_LOCK";
+
+    private static PowerManager.WakeLock wakeLock;
+
+    static boolean isWakeLocked() { return wakeLock != null && wakeLock.isHeld(); }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -30,6 +36,7 @@ public class TermService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (intent != null && ACTION_WAKE_LOCK.equals(intent.getAction())) toggleWakeLock();
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= 26) {
             getSystemService(NotificationManager.class).createNotificationChannel(
@@ -42,20 +49,36 @@ public class TermService extends Service {
                 PendingIntent.FLAG_IMMUTABLE);
         PendingIntent exit = PendingIntent.getService(this, 1,
                 new Intent(this, TermService.class).setAction(ACTION_EXIT), PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent wake = PendingIntent.getService(this, 2,
+                new Intent(this, TermService.class).setAction(ACTION_WAKE_LOCK), PendingIntent.FLAG_IMMUTABLE);
         startForeground(1, b.setContentTitle("Hutao")
-                .setContentText(SESSIONS.size() + " session(s) running")
+                .setContentText(SESSIONS.size() + " phiên đang chạy" + (isWakeLocked() ? " · wake lock bật" : ""))
                 .setSmallIcon(android.R.drawable.ic_menu_manage)
                 .setContentIntent(open)
                 .setOngoing(true)
                 .addAction(new Notification.Action.Builder(null, "Thoát", exit).build())
+                .addAction(new Notification.Action.Builder(null,
+                        isWakeLocked() ? "Tắt wake lock" : "Bật wake lock", wake).build())
                 .build());
         return START_NOT_STICKY;
     }
 
     @Override
     public void onDestroy() {
+        if (isWakeLocked()) wakeLock.release();
         for (TerminalSession s : SESSIONS) s.finishIfRunning();
         SESSIONS.clear();
+    }
+
+    /** Keeps the CPU awake so long jobs (builds, downloads) keep running with the screen off. */
+    private void toggleWakeLock() {
+        if (isWakeLocked()) { wakeLock.release(); return; }
+        if (wakeLock == null) {
+            wakeLock = getSystemService(PowerManager.class)
+                    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "hutao:terminal");
+            wakeLock.setReferenceCounted(false);
+        }
+        wakeLock.acquire();
     }
 
     @Override
