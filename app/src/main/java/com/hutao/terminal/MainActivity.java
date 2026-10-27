@@ -35,18 +35,6 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     private static final int SCROLLBACK_ROWS = 10000;
     private static final List<TerminalSession> SESSIONS = TermService.SESSIONS;
 
-    // Extra keys: label -> Android keycode, or 0 for "type the label".
-    private static final String[][] EXTRA_KEYS = {
-            {"ESC", "" + KeyEvent.KEYCODE_ESCAPE}, {"TAB", "" + KeyEvent.KEYCODE_TAB},
-            {"CTRL", "-1"}, {"ALT", "-2"},
-            {"←", "" + KeyEvent.KEYCODE_DPAD_LEFT}, {"↓", "" + KeyEvent.KEYCODE_DPAD_DOWN},
-            {"↑", "" + KeyEvent.KEYCODE_DPAD_UP}, {"→", "" + KeyEvent.KEYCODE_DPAD_RIGHT},
-            {"HOME", "" + KeyEvent.KEYCODE_MOVE_HOME}, {"END", "" + KeyEvent.KEYCODE_MOVE_END},
-            {"PGUP", "" + KeyEvent.KEYCODE_PAGE_UP}, {"PGDN", "" + KeyEvent.KEYCODE_PAGE_DOWN},
-            {"-", "0"}, {"/", "0"}, {"|", "0"}, {"~", "0"}, {"$", "0"},
-            {"⌨", "-3"}, {"PASTE", "-4"},
-    };
-
     private TerminalView terminal;
     private LinearLayout tabs;
     private TextView ctrlButton, altButton;
@@ -238,6 +226,8 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         addToggle(m, "Font JetBrains Mono", "jetbrainsFont", true);
         addToggle(m, "Giữ màn hình sáng", "keepScreenOn", false);
         addToggle(m, "Rung khi có chuông (bell)", "vibrateOnBell", true);
+        m.getMenu().add("Tải lại phím phụ (~/.hutao/extra-keys.json)")
+                .setOnMenuItemClickListener(i -> { buildExtraKeys(); return true; });
         m.getMenu().add("Wake lock (chạy khi tắt màn hình)").setCheckable(true)
                 .setChecked(TermService.isWakeLocked())
                 .setOnMenuItemClickListener(i -> {
@@ -276,42 +266,108 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
         terminal.setKeepScreenOn(prefs.getBoolean("keepScreenOn", false));
     }
 
+    /** Loads ~/.hutao/extra-keys.json (written with defaults on first run) and builds the key rows. */
     private void buildExtraKeys() {
-        LinearLayout row = findViewById(R.id.extra_keys);
+        File config = new File(getFilesDir(), "home/.hutao/extra-keys.json");
+        String json = ExtraKeys.DEFAULT;
+        try {
+            if (!config.exists()) {
+                config.getParentFile().mkdirs();
+                java.nio.file.Files.write(config.toPath(), json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            } else {
+                json = new String(java.nio.file.Files.readAllBytes(config.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+            }
+        } catch (IOException e) {
+            logStackTrace(TAG, e);
+        }
+        List<List<ExtraKeys.Key>> rows;
+        try {
+            rows = ExtraKeys.parse(json);
+        } catch (org.json.JSONException e) {
+            Toast.makeText(this, "extra-keys.json lỗi, dùng mặc định: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            try { rows = ExtraKeys.parse(ExtraKeys.DEFAULT); } catch (org.json.JSONException impossible) { throw new IllegalStateException(impossible); }
+        }
+
+        LinearLayout container = findViewById(R.id.extra_keys);
+        container.removeAllViews();
+        ctrlButton = altButton = null;
         float dp = getResources().getDisplayMetrics().density;
-        for (String[] key : EXTRA_KEYS) {
-            TextView b = new TextView(this);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, (int) (40 * dp));
-            lp.setMargins((int) (2 * dp), 0, (int) (2 * dp), 0);
-            b.setLayoutParams(lp);
-            b.setMinWidth((int) (44 * dp));
-            b.setPadding((int) (10 * dp), 0, (int) (10 * dp), 0);
-            b.setGravity(android.view.Gravity.CENTER);
-            b.setBackgroundResource(R.drawable.key);
-            b.setTextColor(getColor(R.color.text));
-            b.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-            b.setTextSize(13);
-            b.setText(key[0]);
-            int code = Integer.parseInt(key[1]);
-            if (code == -1) ctrlButton = b;
-            if (code == -2) altButton = b;
-            b.setOnClickListener(v -> onExtraKey(key[0], code));
-            row.addView(b);
+        for (List<ExtraKeys.Key> row : rows) {
+            LinearLayout line = new LinearLayout(this);
+            container.addView(line);
+            for (ExtraKeys.Key key : row) {
+                TextView b = new TextView(this);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, (int) (38 * dp), 1f);
+                lp.setMargins((int) (2 * dp), (int) (2 * dp), (int) (2 * dp), (int) (2 * dp));
+                b.setLayoutParams(lp);
+                b.setGravity(android.view.Gravity.CENTER);
+                b.setBackgroundResource(R.drawable.key);
+                b.setTextColor(getColor(R.color.text));
+                b.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+                b.setTextSize(12);
+                b.setSingleLine();
+                b.setText(keyLabel(key));
+                if ("CTRL".equals(key.key)) ctrlButton = b;
+                if ("ALT".equals(key.key)) altButton = b;
+                b.setOnTouchListener(new SwipeUpListener(key));
+                line.addView(b);
+            }
+        }
+        updateModifierButtons();
+    }
+
+    private CharSequence keyLabel(ExtraKeys.Key key) {
+        String main = ExtraKeys.label(key.key);
+        if (key.popup == null) return main;
+        // Show the swipe-up key small and dimmed next to the main one.
+        android.text.SpannableString s = new android.text.SpannableString(main + " " + ExtraKeys.label(key.popup));
+        s.setSpan(new android.text.style.RelativeSizeSpan(0.7f), main.length(), s.length(), 0);
+        s.setSpan(new android.text.style.ForegroundColorSpan(getColor(R.color.muted)), main.length(), s.length(), 0);
+        return s;
+    }
+
+    /** Tap sends the key; swiping up sends its popup key, like Termux. */
+    private class SwipeUpListener implements View.OnTouchListener {
+        private final ExtraKeys.Key key;
+        private float downY;
+
+        SwipeUpListener(ExtraKeys.Key key) { this.key = key; }
+
+        @Override public boolean onTouch(View v, MotionEvent e) {
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downY = e.getY();
+                    v.setPressed(true);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    v.setPressed(false);
+                    boolean swiped = key.popup != null && downY - e.getY() > v.getHeight() / 2f;
+                    onExtraKey(swiped ? key.popup : key.key);
+                    v.performClick();
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    v.setPressed(false);
+                    return true;
+                default:
+                    return true;
+            }
         }
     }
 
-    private void onExtraKey(String label, int code) {
-        if (code == -1) { ctrl = !ctrl; updateModifierButtons(); return; }
-        if (code == -2) { alt = !alt; updateModifierButtons(); return; }
-        if (code == -3) { getSystemService(InputMethodManager.class).toggleSoftInput(0, 0); return; }
-        if (code == -4) { onPasteTextFromClipboard(terminal.getCurrentSession()); return; }
-        if (code == 0) {
-            terminal.inputCodePoint(label.codePointAt(0), ctrl, alt);
-        } else {
+    private void onExtraKey(String key) {
+        switch (key) {
+            case "CTRL": ctrl = !ctrl; updateModifierButtons(); return;
+            case "ALT": alt = !alt; updateModifierButtons(); return;
+            case "KEYBOARD": getSystemService(InputMethodManager.class).toggleSoftInput(0, 0); return;
+            case "PASTE": onPasteTextFromClipboard(terminal.getCurrentSession()); return;
+        }
+        int code = ExtraKeys.keyCode(key);
+        if (code != 0) {
             int mod = (ctrl ? com.termux.terminal.KeyHandler.KEYMOD_CTRL : 0)
                     | (alt ? com.termux.terminal.KeyHandler.KEYMOD_ALT : 0);
             terminal.handleKeyCode(code, mod);
+        } else {
+            key.codePoints().forEach(cp -> terminal.inputCodePoint(cp, ctrl, alt));
         }
         clearModifiers();
     }
@@ -323,8 +379,9 @@ public class MainActivity extends Activity implements TerminalSessionClient, Ter
     }
 
     private void updateModifierButtons() {
-        ctrlButton.setTextColor(getColor(ctrl ? R.color.accent : R.color.text));
-        altButton.setTextColor(getColor(alt ? R.color.accent : R.color.text));
+        // Either may be missing from a custom layout.
+        if (ctrlButton != null) ctrlButton.setTextColor(getColor(ctrl ? R.color.accent : R.color.text));
+        if (altButton != null) altButton.setTextColor(getColor(alt ? R.color.accent : R.color.text));
     }
 
     // ---- TerminalSessionClient ----

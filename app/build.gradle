@@ -21,4 +21,5 @@ android {
 dependencies {
     implementation 'com.github.termux.termux-app:terminal-view:v0.118.0'
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303' // real org.json; android.jar only has stubs
 }

@@ -76,17 +76,12 @@
         android:paddingEnd="6dp"
         android:focusableInTouchMode="true" />
 
-    <HorizontalScrollView
+    <LinearLayout
+        android:id="@+id/extra_keys"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#CC261D29"
-        android:scrollbars="none">
-        <LinearLayout
-            android:id="@+id/extra_keys"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="4dp" />
-    </HorizontalScrollView>
+        android:orientation="vertical"
+        android:padding="3dp" />
 </LinearLayout>
 </FrameLayout>
